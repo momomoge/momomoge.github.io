@@ -1,7 +1,48 @@
-pre {
-  background-color: #f8f8f8;
-  font-size: 14px;
-  padding: 10px;
-  margin: 10px 0;
-  border-radius: 5px;
+body {
+  background-color: coral;
+}
+.Top {
+  display: grid;
+  grid-template-columns: 60% 40%;
+  grid-template-rows: auto;
+  grid-template-areas:
+    "header header"
+    "main submenu"
+    "footer footer";
+}
+.header {
+  grid-area: header;
+  display: flex;
+  background-color: brown;
+  color: orange;
+  align-items: center;
+}
+.header ul {
+  display: flex;
+  list-style: none;
+}
+.header a {
+  text-decoration: none;
+  color: orange;
+  margin: 0 30px;
+}
+.main {
+  grid-area: main;
+  color: ghostwhite;
+}
+.submenu {
+  grid-area: submenu;
+  border: solid 5px;
+  background-color: darkgrey;
+}
+.submenu a {
+  text-decoration: none;
+  color: ghostwhite;
+}
+.footer {
+  grid-area: footer;
+  background-color: silver;
+  height: 50px;
+  padding-top: 25px;
+  text-align: center;
 }
