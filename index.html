@@ -1,38 +1,153 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>ここにタイトル</title>
-<link rel="stylesheet" href="1.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>バリアフリー & 熱中症回避ルート検索</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+  <style>
+    body{margin:0;font-family:sans-serif,font-size: 1px}
+    #map{position:absolute;top:0;right:0;bottom:0;left:0}
+    #controls{position:absolute;bottom:0px;left:10px;background:white;padding:10px;z-index:1000;border-radius:6px;box-shadow:0 2px 5px rgba(0,0,0,0.2)}
+    label,input,button{display:block;margin-bottom:4px;font-size:10px}
+  </style>
 </head>
-
 <body>
-<header>
-    <h1>サイト内におけるタイトル</h1>
-</header>
-<div id="branding">
-  <p>Simple Design.</p>
+<div id="controls">
+  <label><input type="checkbox" id="avoidSun" checked /> 熱中症（日陰ルート優先）</label>
+  <label><input type="checkbox" id="barrierFree" checked /> バリアフリー（段差回避）</label>
+  <label><input type="checkbox" id="railAccess" /> 鉄道を利用する</label>
+  <label><input type="checkbox" id="mobilityShare" /> シェアモビリティ使用</label>
+  <input type="text" id="startInput" placeholder="出発地住所" />
+  <input type="text" id="endInput" placeholder="目的地住所" />
+  <button onclick="geocodeRoute()">検索</button>
 </div>
-<nav>
-  <ul>
-    <li><a href="#">ナビ1</a></li>
-    <li><a href="#">ナビ2</a></li>
-    <li><a href="#">ナビ3</a></li>
-    <li><a href="#">ナビ4</a></li>
-  </ul>
-</nav>
-<section>
-<article>
-  <span class="date">ここに日付</span>
-  <h2>ここにタイトル</h2>
-  <p>
-   ここにテキスト
-  </p>
-  <a href="#" class="btn">&gt;もっと見る</a>
-</article>
-</section>
-<footer>
-<address>Copyright(C)ここに年 個人名or会社名,Allright Reserved.</address>
-</footer>
+<div id="map"></div>
+<canvas id="shade" style="position:absolute;top:0;left:0;pointer-events:none"></canvas>
+
+<script>
+const map = L.map('map').setView([35.6895,139.6917], 15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution:'© OSM contributors'
+}).addTo(map);
+
+const shadeCanvas=document.getElementById('shade');
+const ctx=shadeCanvas.getContext('2d');
+function resizeCanvas(){
+  shadeCanvas.width=map.getSize().x;
+  shadeCanvas.height=map.getSize().y;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+let buildings, sidewalks, rails, mobility;
+Promise.all([
+  fetch('data/buildings.geojson').then(r=>r.json()),
+  fetch('data/sidewalk.geojson').then(r=>r.json()),
+  fetch('data/rail.geojson').then(r=>r.json()),
+  fetch('data/mobility.geojson').then(r=>r.json())
+]).then(([b,s,r,m])=>{
+  buildings=b; sidewalks=s; rails=r; mobility=m; init();
+});
+
+let startMarker,endMarker,routeLayer;
+function init(){
+  map.on('click', e=>{
+    if(!startMarker){
+      startMarker=L.marker(e.latlng,{draggable:true}).addTo(map);
+    }else if(!endMarker){
+      endMarker=L.marker(e.latlng,{draggable:true}).addTo(map);
+      calcAndDraw();
+    }
+  });
+}
+
+function geocodeRoute(){
+  const startText = document.getElementById('startInput').value;
+  const endText = document.getElementById('endInput').value;
+  Promise.all([
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(startText)}`)
+      .then(r => r.json()),
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(endText)}`)
+      .then(r => r.json())
+  ]).then(([startRes, endRes]) => {
+    if(startRes.length && endRes.length){
+      const s = startRes[0], e = endRes[0];
+      const startLatLng = L.latLng(parseFloat(s.lat), parseFloat(s.lon));
+      const endLatLng = L.latLng(parseFloat(e.lat), parseFloat(e.lon));
+      if(startMarker) map.removeLayer(startMarker);
+      if(endMarker) map.removeLayer(endMarker);
+      startMarker = L.marker(startLatLng, {draggable:true}).addTo(map);
+      endMarker = L.marker(endLatLng, {draggable:true}).addTo(map);
+      calcAndDraw();
+    }else{
+      alert("住所が見つかりませんでした。");
+    }
+  });
+}
+
+async function calcAndDraw(){
+  if (!startMarker || !endMarker) return;
+  const start = startMarker.getLatLng();
+  const end = endMarker.getLatLng();
+  const avoidSun = document.getElementById('avoidSun').checked;
+  const barrierFree = document.getElementById('barrierFree').checked;
+  const railAccess = document.getElementById('railAccess').checked;
+  const mobilityShare = document.getElementById('mobilityShare').checked;
+
+  try {
+    const url = `https://router.project-osrm.org/route/v1/foot/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    const json = await res.json();
+
+    if (!json.routes || json.routes.length === 0) {
+      alert("ルートが見つかりませんでした。");
+      return;
+    }
+
+    const baseLine = turf.lineString(json.routes[0].geometry.coordinates);
+    drawRoute(baseLine);
+    if (avoidSun) drawShade(baseLine);
+  } catch (err) {
+    console.error("ルート検索エラー:", err);
+    alert("ルート検索に失敗しました。");
+  }
+}
+
+function drawRoute(line){
+  if(routeLayer) map.removeLayer(routeLayer);
+  routeLayer=L.geoJSON(line,{style:{color:'#0099ff',weight:6}}).addTo(map);
+}
+
+function sunVec(date,lat){
+  const rad=Math.PI/180;
+  const h=date.getHours()+date.getMinutes()/60;
+  const elev=Math.max(0, 50*Math.sin((h-6)/12*Math.PI));
+  const az=180;
+  return {dx:Math.cos(elev*rad)*Math.sin(az*rad),dy:-Math.cos(elev*rad)*Math.cos(az*rad)};
+}
+
+function drawShade(line){
+  const proj=map.latLngToContainerPoint.bind(map);
+  const sun=sunVec(new Date(),map.getCenter().lat);
+  ctx.clearRect(0,0,shadeCanvas.width,shadeCanvas.height);
+  ctx.strokeStyle='rgba(0,0,0,0.25)';
+  ctx.lineWidth=10;
+  const coords=line.geometry.coordinates;
+  coords.forEach((c,i)=>{
+    if(i===coords.length-1)return;
+    const p1=proj([c[1],c[0]]);
+    const p2=proj([coords[i+1][1],coords[i+1][0]]);
+    ctx.beginPath();
+    ctx.moveTo(p1.x+sun.dx*10,p1.y+sun.dy*10);
+    ctx.lineTo(p2.x+sun.dx*10,p2.y+sun.dy*10);
+    ctx.stroke();
+  });
+}
+
+map.on('move',()=>{if(routeLayer) drawShade(routeLayer.toGeoJSON());});
+</script>
 </body>
 </html>
