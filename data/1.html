@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>個別ケアプラン作成ツール</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h2 { color: #2c3e50; }
+    .section { margin-bottom: 20px; }
+    .output { border: 1px solid #ccc; padding: 10px; background: #f9f9f9; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+
+  <h1>ケアプラン作成チェックリスト</h1>
+
+  <div class="section">
+    <h2>1. 基本情報</h2>
+    <label><input type="checkbox" id="independent"> 一部自立している</label><br>
+    <label><input type="checkbox" id="needsHelp"> 日常生活で一部介助が必要</label><br>
+    <label><input type="checkbox" id="fullAssist"> 全介助が必要</label><br>
+    <label><input type="checkbox" id="dementia"> 認知症状がある</label><br>
+    <label><input type="checkbox" id="medicalCare"> 医療的ケアが必要（吸引・経管など）</label><br>
+  </div>
+
+  <div class="section">
+    <h2>2. 利用者の意向</h2>
+    <label><input type="checkbox" id="stayHome"> 住み慣れた自宅で暮らしたい</label><br>
+    <label><input type="checkbox" id="goToFacility"> 施設入所を希望している</label><br>
+  </div>
+
+  <div class="section">
+    <h2>3. 援助方針</h2>
+    <label><input type="checkbox" id="useDayService"> デイサービスを利用したい</label><br>
+    <label><input type="checkbox" id="visitCare"> 訪問介護を使いたい</label><br>
+    <label><input type="checkbox" id="shortStay"> 短期入所を希望</label><br>
+  </div>
+
+  <button onclick="generatePlan()">ケアプランを表示</button>
+
+  <div class="section">
+    <h2>個別ケアプラン（案）</h2>
+    <div class="output" id="planOutput"></div>
+  </div>
+
+  <script>
+    function generatePlan() {
+      const plan = [];
+
+      // 基本情報の判定
+      const isIndependent = document.getElementById('independent').checked;
+      const needsHelp = document.getElementById('needsHelp').checked;
+      const fullAssist = document.getElementById('fullAssist').checked;
+      const hasDementia = document.getElementById('dementia').checked;
+      const needsMedicalCare = document.getElementById('medicalCare').checked;
+
+      // 利用者の意向
+      const stayHome = document.getElementById('stayHome').checked;
+      const goToFacility = document.getElementById('goToFacility').checked;
+
+      // 援助方針
+      const useDayService = document.getElementById('useDayService').checked;
+      const visitCare = document.getElementById('visitCare').checked;
+      const shortStay = document.getElementById('shortStay').checked;
+
+      // 内容作成
+      if (isIndependent) {
+        plan.push("▶ 生活は概ね自立しているが、一部支援を要する。");
+      }
+      if (needsHelp) {
+        plan.push("▶ 日常生活動作の一部に介助を要する。訪問介護などの利用を検討。");
+      }
+      if (fullAssist) {
+        plan.push("▶ 全介助が必要であり、常時支援体制が求められる。");
+      }
+      if (hasDementia) {
+        plan.push("▶ 認知症状があり、見守りや声かけ支援が必要。");
+      }
+      if (needsMedicalCare) {
+        plan.push("▶ 医療的ケア（吸引・経管栄養など）が必要。訪問看護と連携。");
+      }
+
+      if (stayHome) {
+        plan.push("▶ 本人の意向は在宅生活の継続。自宅での支援体制を重視。");
+      }
+      if (goToFacility) {
+        plan.push("▶ 本人・家族ともに施設入所を希望。今後の準備が必要。");
+      }
+
+      if (useDayService) {
+        plan.push("▶ デイサービスを週1～2回利用し、機能訓練・入浴・交流支援を行う。");
+      }
+      if (visitCare) {
+        plan.push("▶ 訪問介護により、入浴・排泄・調理等の日常生活支援を提供。");
+      }
+      if (shortStay) {
+        plan.push("▶ 短期入所（ショートステイ）を活用し、家族の介護負担を軽減。");
+      }
+
+      // 表示
+      document.getElementById('planOutput').textContent = plan.length > 0 ? plan.join('\n') : "入力項目に応じたケアプランがここに表示されます。";
+    }
+  </script>
+
+</body>
+</html>
