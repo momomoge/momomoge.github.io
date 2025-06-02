@@ -2,103 +2,163 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>個別ケアプラン作成ツール</title>
+  <title>ケアプラン作成ツール（様式1・2対応）</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    h2 { color: #2c3e50; }
-    .section { margin-bottom: 20px; }
-    .output { border: 1px solid #ccc; padding: 10px; background: #f9f9f9; white-space: pre-wrap; }
+    body { font-family: sans-serif; padding: 20px; }
+    h1, h2 { color: #2c3e50; }
+    textarea { width: 100%; height: 80px; margin-top: 4px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    table, th, td { border: 1px solid #999; }
+    th, td { padding: 8px; text-align: left; vertical-align: top; }
+    .section { margin-bottom: 30px; }
+    .btns button { margin-right: 10px; }
+    .print-table td, .print-table th { font-size: 12px; }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
-  <h1>ケアプラン作成チェックリスト</h1>
+  <h1>ケアプラン作成ツール（様式1・様式2対応）</h1>
 
   <div class="section">
-    <h2>1. 基本情報</h2>
+    <h2>利用者情報</h2>
+    <label>氏名：<input type="text" id="userName" /></label><br>
+    <label>作成日：<input type="date" id="createDate" /></label>
+  </div>
+
+  <div class="section">
+    <h2>1. アセスメントチェック</h2>
     <label><input type="checkbox" id="independent"> 一部自立している</label><br>
     <label><input type="checkbox" id="needsHelp"> 日常生活で一部介助が必要</label><br>
     <label><input type="checkbox" id="fullAssist"> 全介助が必要</label><br>
     <label><input type="checkbox" id="dementia"> 認知症状がある</label><br>
     <label><input type="checkbox" id="medicalCare"> 医療的ケアが必要（吸引・経管など）</label><br>
-  </div>
-
-  <div class="section">
-    <h2>2. 利用者の意向</h2>
     <label><input type="checkbox" id="stayHome"> 住み慣れた自宅で暮らしたい</label><br>
     <label><input type="checkbox" id="goToFacility"> 施設入所を希望している</label><br>
-  </div>
-
-  <div class="section">
-    <h2>3. 援助方針</h2>
     <label><input type="checkbox" id="useDayService"> デイサービスを利用したい</label><br>
     <label><input type="checkbox" id="visitCare"> 訪問介護を使いたい</label><br>
     <label><input type="checkbox" id="shortStay"> 短期入所を希望</label><br>
   </div>
 
-  <button onclick="generatePlan()">ケアプランを表示</button>
+  <div class="section btns">
+    <button onclick="generatePlans()">ケアプラン生成</button>
+    <button onclick="downloadPDF()">PDF出力</button>
+    <button onclick="window.print()">印刷</button>
+  </div>
 
+  <!-- 様式1 表 -->
   <div class="section">
-    <h2>個別ケアプラン（案）</h2>
-    <div class="output" id="planOutput"></div>
+    <h2>【サービス計画書 第1表】</h2>
+    <table class="print-table">
+      <tr><th>利用者氏名</th><td><span id="nameOut"></span></td><th>要介護度</th><td><span id="careLevelOut"></span></td><th>作成日</th><td><span id="dateOut"></span></td></tr>
+      <tr><th colspan="6">1. 総合的な援助方針</th></tr>
+      <tr><td colspan="6"><textarea id="summaryOut"></textarea></td></tr>
+      <tr><th colspan="6">2. 解決すべき課題</th></tr>
+      <tr><td colspan="6"><textarea id="problemsOut"></textarea></td></tr>
+      <tr><th colspan="6">3. サービス内容</th></tr>
+      <tr><td colspan="6"><textarea id="servicesOut"></textarea></td></tr>
+      <tr><th colspan="6">4. サービス担当者会議の要点</th></tr>
+      <tr><td colspan="6"><textarea id="teamOut"></textarea></td></tr>
+      <tr><th colspan="6">5. 特記事項</th></tr>
+      <tr><td colspan="6"><textarea id="notesOut"></textarea></td></tr>
+    </table>
+  </div>
+
+  <!-- 様式2 表 -->
+  <div class="section">
+    <h2>【サービス計画書 第2表】</h2>
+    <table class="print-table">
+      <thead>
+        <tr>
+          <th>目標</th>
+          <th>サービス内容</th>
+          <th>担当者</th>
+          <th>頻度・期間</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><textarea>在宅生活の維持</textarea></td>
+          <td><textarea>訪問介護（週3回）、入浴・排泄支援</textarea></td>
+          <td><textarea>訪問介護員</textarea></td>
+          <td><textarea>週3回／継続</textarea></td>
+        </tr>
+        <tr>
+          <td><textarea>機能の維持・改善</textarea></td>
+          <td><textarea>デイサービスで機能訓練</textarea></td>
+          <td><textarea>理学療法士</textarea></td>
+          <td><textarea>週2回／6ヶ月</textarea></td>
+        </tr>
+        <tr>
+          <td><textarea>介護負担軽減</textarea></td>
+          <td><textarea>短期入所（ショートステイ）</textarea></td>
+          <td><textarea>ケアマネ</textarea></td>
+          <td><textarea>月1回／必要時</textarea></td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
   <script>
-    function generatePlan() {
-      const plan = [];
+    function generatePlans() {
+      const userName = document.getElementById("userName").value || "（未記入）";
+      const createDate = document.getElementById("createDate").value || "（未記入）";
 
-      // 基本情報の判定
-      const isIndependent = document.getElementById('independent').checked;
-      const needsHelp = document.getElementById('needsHelp').checked;
-      const fullAssist = document.getElementById('fullAssist').checked;
-      const hasDementia = document.getElementById('dementia').checked;
-      const needsMedicalCare = document.getElementById('medicalCare').checked;
+      const score = 
+        (document.getElementById('independent').checked ? 1 : 0) +
+        (document.getElementById('needsHelp').checked ? 2 : 0) +
+        (document.getElementById('fullAssist').checked ? 4 : 0) +
+        (document.getElementById('dementia').checked ? 1 : 0) +
+        (document.getElementById('medicalCare').checked ? 2 : 0);
 
-      // 利用者の意向
-      const stayHome = document.getElementById('stayHome').checked;
-      const goToFacility = document.getElementById('goToFacility').checked;
+      let careLevel = "要支援1";
+      if (score >= 2 && score <= 3) careLevel = "要支援2";
+      else if (score === 4) careLevel = "要介護1";
+      else if (score === 5) careLevel = "要介護2";
+      else if (score === 6) careLevel = "要介護3";
+      else if (score === 7) careLevel = "要介護4";
+      else if (score >= 8) careLevel = "要介護5";
 
-      // 援助方針
-      const useDayService = document.getElementById('useDayService').checked;
-      const visitCare = document.getElementById('visitCare').checked;
-      const shortStay = document.getElementById('shortStay').checked;
+      const summary = document.getElementById('stayHome').checked
+        ? "住み慣れた地域で在宅生活を継続できるよう、訪問介護・デイサービスを活用する。"
+        : "施設入所を視野に支援体制を調整。";
 
-      // 内容作成
-      if (isIndependent) {
-        plan.push("▶ 生活は概ね自立しているが、一部支援を要する。");
-      }
-      if (needsHelp) {
-        plan.push("▶ 日常生活動作の一部に介助を要する。訪問介護などの利用を検討。");
-      }
-      if (fullAssist) {
-        plan.push("▶ 全介助が必要であり、常時支援体制が求められる。");
-      }
-      if (hasDementia) {
-        plan.push("▶ 認知症状があり、見守りや声かけ支援が必要。");
-      }
-      if (needsMedicalCare) {
-        plan.push("▶ 医療的ケア（吸引・経管栄養など）が必要。訪問看護と連携。");
-      }
+      const problems = [
+        document.getElementById('fullAssist').checked ? "全介助が必要。" : "",
+        document.getElementById('dementia').checked ? "認知症状あり。" : "",
+        document.getElementById('medicalCare').checked ? "医療的ケア必要。" : ""
+      ].filter(Boolean).join(" ");
 
-      if (stayHome) {
-        plan.push("▶ 本人の意向は在宅生活の継続。自宅での支援体制を重視。");
-      }
-      if (goToFacility) {
-        plan.push("▶ 本人・家族ともに施設入所を希望。今後の準備が必要。");
-      }
+      const services = [
+        document.getElementById('useDayService').checked ? "デイサービスで入浴・機能訓練。" : "",
+        document.getElementById('visitCare').checked ? "訪問介護で日常生活支援。" : "",
+        document.getElementById('shortStay').checked ? "短期入所による介護負担軽減。" : ""
+      ].filter(Boolean).join("\n");
 
-      if (useDayService) {
-        plan.push("▶ デイサービスを週1～2回利用し、機能訓練・入浴・交流支援を行う。");
-      }
-      if (visitCare) {
-        plan.push("▶ 訪問介護により、入浴・排泄・調理等の日常生活支援を提供。");
-      }
-      if (shortStay) {
-        plan.push("▶ 短期入所（ショートステイ）を活用し、家族の介護負担を軽減。");
-      }
+      const team = "多職種連携による支援体制の構築。";
+      const notes = document.getElementById('goToFacility').checked ? "施設入所を検討中。" : "";
 
-      // 表示
-      document.getElementById('planOutput').textContent = plan.length > 0 ? plan.join('\n') : "入力項目に応じたケアプランがここに表示されます。";
+      document.getElementById("nameOut").textContent = userName;
+      document.getElementById("dateOut").textContent = createDate;
+      document.getElementById("careLevelOut").textContent = careLevel;
+
+      document.getElementById("summaryOut").value = summary;
+      document.getElementById("problemsOut").value = problems;
+      document.getElementById("servicesOut").value = services;
+      document.getElementById("teamOut").value = team;
+      document.getElementById("notesOut").value = notes;
+    }
+
+    function downloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.text("ケアプラン様式1・2", 10, 10);
+      doc.html(document.body, {
+        callback: function (doc) {
+          doc.save("care_plan_full.pdf");
+        },
+        x: 10, y: 20, width: 180, windowWidth: 1000
+      });
     }
   </script>
 
