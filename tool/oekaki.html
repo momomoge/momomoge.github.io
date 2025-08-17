@@ -15,8 +15,8 @@
     }
     #penIcon {
       position: absolute;
-      width: 48px;
-      height: 48px;
+      width: 100px;
+      height: 100px;
       pointer-events: none;
     }
   </style>
@@ -55,8 +55,8 @@
       const pos = getEventPos(e);
 
       // ペン先のオフセット (アイコン中央下をペン先にする)
-      const offsetX = 0;
-      const offsetY = 20;
+      const offsetX = -45;
+      const offsetY = 45;
 
       ctx.lineTo(pos.x + offsetX, pos.y + offsetY);
       ctx.stroke();
