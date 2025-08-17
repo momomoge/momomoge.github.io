@@ -1,225 +1,131 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ペンアイコンお絵描きアプリ</title>
+  <meta charset="UTF-8">
+  <title>お絵描きアプリ</title>
   <style>
-    :root {
-      --bg: #0b1020;
-      --panel: #111934;
-      --ink: #ffffff;
-      --accent: #6aa7ff;
-      --muted: #94a3b8;
+    body { margin: 0; overflow: hidden; }
+    canvas { border: 1px solid #ccc; display: block; touch-action: none; }
+    #toolbar {
+      position: fixed; top: 10px; left: 10px;
+      background: rgba(255,255,255,0.9); padding: 5px; border-radius: 8px;
     }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
-    body {
-      margin: 0; background: linear-gradient(180deg, #0b1020, #0d1226);
-      color: var(--ink); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji';
-      display: grid; grid-template-rows: auto 1fr auto; gap: 8px; 
+    #toolbar input, #toolbar button { margin: 2px; }
+    #cursorPen {
+      position: absolute;
+      width: 32px; height: 32px;
+      pointer-events: none;
+      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="black"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>') no-repeat center;
+      background-size: contain;
+      transform: translate(-4px, -28px); /* ペン先が先端に合うように調整 */
+      display: none;
     }
-    header {
-      display: flex; align-items: center; justify-content: space-between; gap: 12px;
-      padding: 12px 16px; background: rgba(255,255,255,0.04); backdrop-filter: blur(6px);
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-    }
-    header h1 { font-size: 18px; margin: 0; letter-spacing: .02em; }
-
-    .toolbar {
-      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-      padding: 10px; margin: 0 12px; background: var(--panel); border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.35);
-    }
-    .btn {
-      display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; 
-      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-      color: var(--ink); border-radius: 12px; cursor: pointer; user-select: none;
-    }
-    .btn:hover { background: rgba(255,255,255,0.08); }
-    .btn[aria-pressed="true"] { outline: 2px solid var(--accent); background: rgba(106,167,255,0.12); }
-    .btn svg { width: 20px; height: 20px; }
-
-    .row { display: flex; align-items: center; gap: 10px; }
-    .sep { width: 1px; height: 28px; background: rgba(255,255,255,0.12); }
-
-    input[type="color"] { width: 40px; height: 40px; border: none; border-radius: 10px; overflow: hidden; padding: 0; background: transparent; }
-    input[type="range"] { width: 160px; accent-color: var(--accent); }
-    label { font-size: 12px; color: var(--muted); }
-
-    .stage-wrap { position: relative; margin: 10px 12px 16px; border-radius: 20px; overflow: hidden; }
-    canvas { display: block; width: 100%; height: 65vh; background: #0b0f1e; border: 1px solid rgba(255,255,255,0.08); }
-
-    .cursor-pen { cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><path fill="%23ffffff" d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0L4 16.25V20h3.75z"/></svg>') 2 28, crosshair; }
-
-    footer { padding: 8px 12px; color: var(--muted); text-align: center; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>✏️ ペンアイコンお絵描きアプリ</h1>
-    <div class="row" aria-live="polite" id="status">準備完了</div>
-  </header>
-
-  <div class="toolbar" role="toolbar" aria-label="Drawing tools">
-    <button class="btn" id="penBtn" aria-pressed="true" title="ペン (P)">
-      <!-- Pen icon -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-      <span>ペン</span>
-    </button>
-
-    <div class="sep" aria-hidden="true"></div>
-
-    <div class="row">
-      <label for="color">色</label>
-      <input type="color" id="color" value="#4cc9f0" />
-    </div>
-    <div class="row">
-      <label for="size">太さ</label>
-      <input type="range" id="size" min="1" max="60" value="10" />
-      <span id="sizeVal">10px</span>
-    </div>
-
-    <div class="sep" aria-hidden="true"></div>
-
-    <button class="btn" id="undoBtn" title="元に戻す (Ctrl+Z)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M20 20a8 8 0 0 0-16-4"/></svg>
-      <span>元に戻す</span>
-    </button>
-    <button class="btn" id="clearBtn" title="全消去">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a4 4 0 0 1 8 0v2"/></svg>
-      <span>消去</span>
-    </button>
-    <button class="btn" id="saveBtn" title="PNGで保存">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5-5 5 5"/><path d="M12 15V4"/></svg>
-      <span>保存</span>
-    </button>
+  <div id="toolbar">
+    <input type="color" id="colorPicker" value="#000000">
+    <input type="range" id="thickness" min="1" max="20" value="3">
+    <button id="undo">Undo</button>
+    <button id="clear">全消去</button>
+    <button id="save">保存</button>
   </div>
-
-  <div class="stage-wrap">
-    <canvas id="board" class="cursor-pen"></canvas>
-  </div>
-
-  <footer>© 2025 Pen Icon Drawing – ダブルクリックで全画面切替 / スマホ対応</footer>
-
+  <canvas id="canvas"></canvas>
+  <div id="cursorPen"></div>
   <script>
-    const canvas = document.getElementById('board');
+    const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
-    const penBtn = document.getElementById('penBtn');
-    const undoBtn = document.getElementById('undoBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const saveBtn = document.getElementById('saveBtn');
-    const colorEl = document.getElementById('color');
-    const sizeEl = document.getElementById('size');
-    const sizeVal = document.getElementById('sizeVal');
-    const statusEl = document.getElementById('status');
+    const cursorPen = document.getElementById('cursorPen');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
-    let tool = 'pen';
     let drawing = false;
-    let last = null;
-    let dpr = Math.max(1, window.devicePixelRatio || 1);
-    const history = []; // undo stack of ImageData
+    let paths = [];
+    let currentPath = [];
 
-    function resizeCanvas() {
-      const rect = canvas.getBoundingClientRect();
-      const w = Math.max(320, rect.width);
-      const h = Math.max(200, rect.height);
-      const prev = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      canvas.width = Math.floor(w * dpr);
-      canvas.height = Math.floor(h * dpr);
-      ctx.scale(dpr, dpr);
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      if (prev.width && prev.height) ctx.putImageData(prev, 0, 0);
-      drawGrid();
+    function getPos(e) {
+      if (e.touches) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      } else {
+        return { x: e.clientX, y: e.clientY };
+      }
     }
 
-    function drawGrid(){
-      // subtle dots grid
-      const gap = 24; ctx.save(); ctx.globalAlpha = 0.15; ctx.fillStyle = '#93c5fd';
-      for (let y = 0; y < canvas.height/dpr; y += gap) {
-        for (let x = 0; x < canvas.width/dpr; x += gap) {
-          ctx.fillRect(x, y, 1, 1);
+    function startDraw(e) {
+      drawing = true;
+      currentPath = [];
+      const pos = getPos(e);
+      currentPath.push(pos);
+      paths.push({ color: colorPicker.value, thickness: thickness.value, points: currentPath });
+      draw();
+    }
+
+    function draw(e) {
+      if (!drawing) return;
+      if (e) currentPath.push(getPos(e));
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (const path of paths) {
+        ctx.strokeStyle = path.color;
+        ctx.lineWidth = path.thickness;
+        ctx.lineJoin = ctx.lineCap = 'round';
+        ctx.beginPath();
+        for (let i = 0; i < path.points.length; i++) {
+          const p = path.points[i];
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
         }
+        ctx.stroke();
       }
-      ctx.restore();
     }
 
-    function pushHistory() {
-      try { history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
-            if (history.length > 40) history.shift(); } catch(e) {}
+    function endDraw() { drawing = false; }
+
+    function updateCursor(e) {
+      const pos = getPos(e);
+      cursorPen.style.left = pos.x + 'px';
+      cursorPen.style.top = pos.y + 'px';
+      cursorPen.style.display = 'block';
     }
 
-    function setTool(next) {
-      tool = next;
-      penBtn.setAttribute('aria-pressed', String(tool === 'pen'));
-      canvas.classList.toggle('cursor-pen', tool === 'pen');
-      statusEl.textContent = tool === 'pen' ? 'ペン: 描画できます' : 'ツール待機中';
-    }
+    // PC用イベント
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', (e) => { if (drawing) draw(e); updateCursor(e); });
+    canvas.addEventListener('mouseup', endDraw);
+    canvas.addEventListener('mouseleave', endDraw);
 
-    function begin(pt){
-      if (tool !== 'pen') return; drawing = true; last = pt; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      ctx.strokeStyle = colorEl.value; ctx.lineWidth = Number(sizeEl.value); ctx.globalCompositeOperation = 'source-over';
-      ctx.beginPath(); ctx.moveTo(pt.x, pt.y);
-    }
-    function move(pt){
-      if (!drawing) return; ctx.lineTo(pt.x, pt.y); ctx.stroke(); last = pt;
-    }
-    function end(){ if (!drawing) return; drawing = false; ctx.closePath(); pushHistory(); }
+    // スマホ用イベント
+    canvas.addEventListener('touchstart', (e) => { startDraw(e); updateCursor(e); });
+    canvas.addEventListener('touchmove', (e) => { draw(e); updateCursor(e); });
+    canvas.addEventListener('touchend', endDraw);
 
-    function getPoint(e) {
-      const rect = canvas.getBoundingClientRect();
-      if (e.touches && e.touches[0]) {
-        return { x: (e.touches[0].clientX - rect.left), y: (e.touches[0].clientY - rect.top) };
-      }
-      return { x: (e.clientX - rect.left), y: (e.clientY - rect.top) };
-    }
+    // Undo機能
+    document.getElementById('undo').addEventListener('click', () => {
+      paths.pop();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      draw();
+    });
 
-    // events
-    canvas.addEventListener('mousedown', e => begin(getPoint(e)));
-    canvas.addEventListener('mousemove', e => move(getPoint(e)));
-    window.addEventListener('mouseup', end);
+    // 全消去
+    document.getElementById('clear').addEventListener('click', () => {
+      paths = [];
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
 
-    canvas.addEventListener('touchstart', e => { e.preventDefault(); begin(getPoint(e)); }, {passive:false});
-    canvas.addEventListener('touchmove',  e => { e.preventDefault(); move(getPoint(e)); }, {passive:false});
-    canvas.addEventListener('touchend',   e => { e.preventDefault(); end(); }, {passive:false});
-
-    // controls
-    penBtn.addEventListener('click', () => setTool('pen'));
-    sizeEl.addEventListener('input', () => sizeVal.textContent = sizeEl.value + 'px');
-    undoBtn.addEventListener('click', () => { if (!history.length) return; const snap = history.pop(); ctx.putImageData(snap, 0, 0); });
-    clearBtn.addEventListener('click', () => { pushHistory(); ctx.clearRect(0,0,canvas.width,canvas.height); drawGrid(); });
-    saveBtn.addEventListener('click', () => {
+    // 保存
+    document.getElementById('save').addEventListener('click', () => {
       const link = document.createElement('a');
-      link.download = `drawing_${Date.now()}.png`;
-      // export at CSS pixels scale
-      const exportCanvas = document.createElement('canvas');
-      exportCanvas.width = Math.floor(canvas.width);
-      exportCanvas.height = Math.floor(canvas.height);
-      const ex = exportCanvas.getContext('2d');
-      ex.drawImage(canvas, 0, 0);
-      link.href = exportCanvas.toDataURL('image/png');
+      link.download = 'drawing.png';
+      link.href = canvas.toDataURL();
       link.click();
     });
 
-    // keyboard shortcuts
-    window.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { undoBtn.click(); }
-      if (e.key.toLowerCase() === 'p') { setTool('pen'); }
+    // 画面リサイズ対応
+    window.addEventListener('resize', () => {
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      ctx.putImageData(imgData, 0, 0);
     });
-
-    // fullscreen toggle on double click
-    canvas.addEventListener('dblclick', () => {
-      if (!document.fullscreenElement) canvas.requestFullscreen?.(); else document.exitFullscreen?.();
-    });
-
-    // initial mount
-    const ro = new ResizeObserver(() => resizeCanvas());
-    ro.observe(canvas);
-    // initial size (give it some layout first)
-    setTimeout(resizeCanvas, 50);
-    pushHistory();
   </script>
 </body>
 </html>
