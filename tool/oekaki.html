@@ -4,46 +4,38 @@
   <meta charset="UTF-8">
   <title>お絵描きアプリ</title>
   <style>
-    body { margin: 0; overflow: hidden; }
-    canvas { border: 1px solid #ccc; display: block; touch-action: none; }
-    #toolbar {
-      position: fixed; top: 10px; left: 10px;
-      background: rgba(255,255,255,0.9); padding: 5px; border-radius: 8px;
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #f0f0f0;
     }
-    #toolbar input, #toolbar button { margin: 2px; }
-    #cursorPen {
+    canvas {
+      display: block;
+      background: #fff;
+    }
+    #penIcon {
       position: absolute;
-      width: 32px; height: 32px;
+      width: 48px;
+      height: 48px;
       pointer-events: none;
-      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="black"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>') no-repeat center;
-      background-size: contain;
-      transform: translate(-4px, -28px); /* ペン先が先端に合うように調整 */
-      display: none;
     }
   </style>
 </head>
 <body>
-  <div id="toolbar">
-    <input type="color" id="colorPicker" value="#000000">
-    <input type="range" id="thickness" min="1" max="20" value="3">
-    <button id="undo">Undo</button>
-    <button id="clear">全消去</button>
-    <button id="save">保存</button>
-  </div>
-  <canvas id="canvas"></canvas>
-  <div id="cursorPen"></div>
+  <canvas id="drawingCanvas"></canvas>
+  <img id="penIcon" src="https://cdn-icons-png.flaticon.com/512/84/84380.png" alt="Pen">
+
   <script>
-    const canvas = document.getElementById('canvas');
+    const canvas = document.getElementById('drawingCanvas');
     const ctx = canvas.getContext('2d');
-    const cursorPen = document.getElementById('cursorPen');
+    const penIcon = document.getElementById('penIcon');
+
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
     let drawing = false;
-    let paths = [];
-    let currentPath = [];
 
-    function getPos(e) {
+    function getEventPos(e) {
       if (e.touches) {
         return { x: e.touches[0].clientX, y: e.touches[0].clientY };
       } else {
@@ -51,81 +43,46 @@
       }
     }
 
-    function startDraw(e) {
+    function startDrawing(e) {
       drawing = true;
-      currentPath = [];
-      const pos = getPos(e);
-      currentPath.push(pos);
-      paths.push({ color: colorPicker.value, thickness: thickness.value, points: currentPath });
-      draw();
+      const pos = getEventPos(e);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
     }
 
     function draw(e) {
       if (!drawing) return;
-      if (e) currentPath.push(getPos(e));
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      for (const path of paths) {
-        ctx.strokeStyle = path.color;
-        ctx.lineWidth = path.thickness;
-        ctx.lineJoin = ctx.lineCap = 'round';
-        ctx.beginPath();
-        for (let i = 0; i < path.points.length; i++) {
-          const p = path.points[i];
-          if (i === 0) ctx.moveTo(p.x, p.y);
-          else ctx.lineTo(p.x, p.y);
-        }
-        ctx.stroke();
-      }
+      const pos = getEventPos(e);
+
+      // ペン先のオフセット (アイコン中央下をペン先にする)
+      const offsetX = 0;
+      const offsetY = 20;
+
+      ctx.lineTo(pos.x + offsetX, pos.y + offsetY);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(pos.x + offsetX, pos.y + offsetY);
+
+      // ペンアイコンをずらして表示
+      penIcon.style.left = (pos.x - penIcon.width / 2) + 'px';
+      penIcon.style.top = (pos.y - penIcon.height / 2) + 'px';
     }
 
-    function endDraw() { drawing = false; }
-
-    function updateCursor(e) {
-      const pos = getPos(e);
-      cursorPen.style.left = pos.x + 'px';
-      cursorPen.style.top = pos.y + 'px';
-      cursorPen.style.display = 'block';
+    function stopDrawing() {
+      drawing = false;
+      ctx.beginPath();
     }
 
-    // PC用イベント
-    canvas.addEventListener('mousedown', startDraw);
-    canvas.addEventListener('mousemove', (e) => { if (drawing) draw(e); updateCursor(e); });
-    canvas.addEventListener('mouseup', endDraw);
-    canvas.addEventListener('mouseleave', endDraw);
+    // イベント登録
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('touchstart', startDrawing);
 
-    // スマホ用イベント
-    canvas.addEventListener('touchstart', (e) => { startDraw(e); updateCursor(e); });
-    canvas.addEventListener('touchmove', (e) => { draw(e); updateCursor(e); });
-    canvas.addEventListener('touchend', endDraw);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('touchmove', draw);
 
-    // Undo機能
-    document.getElementById('undo').addEventListener('click', () => {
-      paths.pop();
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      draw();
-    });
-
-    // 全消去
-    document.getElementById('clear').addEventListener('click', () => {
-      paths = [];
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    });
-
-    // 保存
-    document.getElementById('save').addEventListener('click', () => {
-      const link = document.createElement('a');
-      link.download = 'drawing.png';
-      link.href = canvas.toDataURL();
-      link.click();
-    });
-
-    // 画面リサイズ対応
-    window.addEventListener('resize', () => {
-      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      ctx.putImageData(imgData, 0, 0);
-    });
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseleave', stopDrawing);
+    canvas.addEventListener('touchend', stopDrawing);
   </script>
 </body>
 </html>
