@@ -1,149 +1,88 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ペン先でお絵かきアプリ</title>
-    <!-- Tailwind CSSを読み込み -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* ページの基本スタイル */
-        html, body {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden; /* スクロールバーを非表示 */
-            font-family: 'Inter', sans-serif;
-        }
-        /* ペン先のカーソルを定義 */
-        .pen-cursor {
-            /* ペンアイコンのSVGを直接指定し、カーソルのホットスポット（クリック位置）を左上(0)からペン先(28)に設定 */
-            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3 16.828V21h4.172l14.002-14.002z"></path><path d="m15 5 6 6"></path></svg>') 0 28, auto;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>お絵描きアプリ</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #f0f0f0;
+    }
+    canvas {
+      display: block;
+      background: #fff;
+    }
+    #penIcon {
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      pointer-events: none;
+    }
+  </style>
 </head>
-<body class="bg-gray-100 flex flex-col h-screen">
+<body>
+  <canvas id="drawingCanvas"></canvas>
+  <img id="penIcon" src="https://cdn-icons-png.flaticon.com/512/1250/1250615.png" alt="Pen">
 
-    <!-- ヘッダーとコントロールパネル -->
-    <header class="bg-white shadow-md p-2 sm:p-4 w-full z-10">
-        <div class="container mx-auto flex flex-wrap justify-center sm:justify-between items-center gap-4">
-            <h1 class="text-lg sm:text-xl font-bold text-gray-700">ペン先でお絵かき</h1>
-            <div class="flex items-center gap-4">
-                <!-- 色選択 -->
-                <div class="flex items-center gap-2">
-                    <label for="colorPicker" class="text-sm font-medium text-gray-600">色:</label>
-                    <input type="color" id="colorPicker" value="#000000" class="w-10 h-10 p-1 border border-gray-300 rounded-lg cursor-pointer">
-                </div>
-                <!-- 太さ選択 -->
-                <div class="flex items-center gap-2">
-                    <label for="lineWidth" class="text-sm font-medium text-gray-600">太さ:</label>
-                    <input type="range" id="lineWidth" min="1" max="50" value="5" class="w-24 sm:w-32 cursor-pointer">
-                </div>
-                <!-- クリアボタン -->
-                <button id="clearButton" class="px-4 py-2 bg-red-500 text-white font-semibold rounded-lg shadow-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-75 transition duration-200">
-                    クリア
-                </button>
-            </div>
-        </div>
-    </header>
+  <script>
+    const canvas = document.getElementById('drawingCanvas');
+    const ctx = canvas.getContext('2d');
+    const penIcon = document.getElementById('penIcon');
 
-    <!-- 描画エリア -->
-    <main class="flex-grow w-full h-full p-4">
-        <canvas id="drawingCanvas" class="w-full h-full bg-white rounded-lg shadow-inner pen-cursor"></canvas>
-    </main>
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
-    <script>
-        window.addEventListener('load', () => {
-            const canvas = document.getElementById('drawingCanvas');
-            const ctx = canvas.getContext('2d');
-            const colorPicker = document.getElementById('colorPicker');
-            const clearButton = document.getElementById('clearButton');
-            const lineWidthSlider = document.getElementById('lineWidth');
+    let drawing = false;
 
-            let isDrawing = false;
-            let lastX = 0;
-            let lastY = 0;
+    function getEventPos(e) {
+      if (e.touches) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      } else {
+        return { x: e.clientX, y: e.clientY };
+      }
+    }
 
-            // キャンバスのサイズをコンテナに合わせて設定する関数
-            function resizeCanvas() {
-                const parent = canvas.parentElement;
-                // 解像度を維持するために、CSSのサイズではなくcanvasのwidth/height属性を設定
-                canvas.width = parent.clientWidth;
-                canvas.height = parent.clientHeight;
-                // リサイズ後に線の設定を再適用
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-            }
+    function startDrawing(e) {
+      drawing = true;
+      const pos = getEventPos(e);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+    }
 
-            // 座標を取得するヘルパー関数 (マウスとタッチイベントに対応)
-            function getCoordinates(event) {
-                if (event.touches && event.touches.length > 0) {
-                    // タッチイベントの場合
-                    const rect = canvas.getBoundingClientRect();
-                    return {
-                        x: event.touches[0].clientX - rect.left,
-                        y: event.touches[0].clientY - rect.top
-                    };
-                } else {
-                    // マウスイベントの場合
-                    return { x: event.offsetX, y: event.offsetY };
-                }
-            }
-            
-            // 描画を開始する関数
-            function startDrawing(e) {
-                e.preventDefault(); // タッチデバイスでのスクロールを防止
-                isDrawing = true;
-                const coords = getCoordinates(e);
-                [lastX, lastY] = [coords.x, coords.y];
-            }
+    function draw(e) {
+      if (!drawing) return;
+      const pos = getEventPos(e);
 
-            // 描画中の関数
-            function draw(e) {
-                if (!isDrawing) return;
-                e.preventDefault();
+      // ペン先のオフセット (アイコン中央下をペン先にする)
+      const offsetX = -95;
+      const offsetY = 95;
 
-                const coords = getCoordinates(e);
-                
-                ctx.beginPath();
-                ctx.moveTo(lastX, lastY);
-                ctx.lineTo(coords.x, coords.y);
-                
-                ctx.strokeStyle = colorPicker.value;
-                ctx.lineWidth = lineWidthSlider.value;
-                
-                ctx.stroke();
-                
-                [lastX, lastY] = [coords.x, coords.y];
-            }
+      ctx.lineTo(pos.x + offsetX, pos.y + offsetY);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(pos.x + offsetX, pos.y + offsetY);
 
-            // 描画を終了する関数
-            function stopDrawing() {
-                isDrawing = false;
-            }
+      // ペンアイコンをずらして表示
+      penIcon.style.left = (pos.x - penIcon.width / 2) + 'px';
+      penIcon.style.top = (pos.y - penIcon.height / 2) + 'px';
+    }
 
-            // イベントリスナーを設定
-            canvas.addEventListener('mousedown', startDrawing);
-            canvas.addEventListener('mousemove', draw);
-            canvas.addEventListener('mouseup', stopDrawing);
-            canvas.addEventListener('mouseleave', stopDrawing); // キャンバス外に出たら描画終了
+    function stopDrawing() {
+      drawing = false;
+      ctx.beginPath();
+    }
 
-            // タッチデバイス対応
-            canvas.addEventListener('touchstart', startDrawing);
-            canvas.addEventListener('touchmove', draw);
-            canvas.addEventListener('touchend', stopDrawing);
+    // イベント登録
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('touchstart', startDrawing);
 
-            // クリアボタンの処理
-            clearButton.addEventListener('click', () => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            });
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('touchmove', draw);
 
-            // ウィンドウリサイズ時にキャンバスサイズを調整
-            window.addEventListener('resize', resizeCanvas);
-
-            // 初期化
-            resizeCanvas();
-        });
-    </script>
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseleave', stopDrawing);
+    canvas.addEventListener('touchend', stopDrawing);
+  </script>
 </body>
 </html>
